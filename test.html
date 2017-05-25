@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+		<!-- numbas stuff -->
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/numbas.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme-builtins.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme-display.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/math.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/util.js" charset="utf-8"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/localisation.js" charset="utf-8"></script>
+
+		<!-- R.js - localisation -->
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/i18next/i18next.js"></script>
+		<script charset="UTF-8" type="text/javascript" src="../../tests/locales.js"></script>
+
+		<!--JQuery scripts-->
+		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jquery/jquery.js"></script>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+		<script src="linearalgebra.js"></script>
+
+        <style>
+            section ~ section  {
+                border-top: 1px solid #888;
+                padding-top: 1em;
+                margin-top: 5em;
+            }
+            .question {
+                font-size: 1.2em;
+                font-weight: bold;
+            }
+        </style>
+</head>
+<body>
+
+    <section>
+        <button id="randomise">Randomise</button>
+        <table id="matrix-entry">
+        </table>
+
+        <div id="debug"></div>
+    </section>
+
+    <section id="working">
+    </section>
+
+		<script>
+Numbas.queueScript('base',['jquery'],function() {});
+Numbas.queueScript('go',['jme','extensions/linearalgebra/linearalgebra.js'],function() {
+
+var linearalgebra = Numbas.extensions.linearalgebra;
+
+var scope = new Numbas.jme.Scope([Numbas.jme.builtinScope,linearalgebra.scope]);
+var TMatrix = Numbas.jme.types.TMatrix;
+
+function element(name,attrs,content) {
+    var e = document.createElement(name);
+    for(var k in attrs) {
+        e.setAttribute(k,attrs[k]);
+    }
+    if(content!==undefined) {
+        e.innerHTML = content;
+    }
+    return e;
+}
+
+var input_matrix = [];
+function update() {
+    var debug = document.getElementById('debug');
+    debug.innerHTML = '';
+    function is_valid(m) {
+        for(var column=0;column<m[0].length;column++) {
+            if(m[0][column]=='') {
+                break;
+            }
+        }
+        var columns = column;
+        var rows = columns==0 ? 0 : 1;
+        var contiguous = true;
+        for(var row=1;row<m.length;row++) {
+            if(m[row][0]!='') {
+                rows = row+1;
+            }
+            if(m[row][0]=='') {
+                contiguous = false;
+            }
+            for(column=0;column<m[0].length;column++) {
+                if((contiguous && column>0 && column<columns && m[row][column]=='') || ((column>=columns || !contiguous) && m[row][column]!='') ) {
+                    return false;
+                }
+            }
+        }
+        var ok = true;
+        var out = m.slice(0,rows).map(function(r){ 
+            return r.slice(0,columns).map(function(c) {
+                try {
+                    var v = scope.evaluate(c);
+                    if(v.type!='number') {
+                        ok = false;
+                    } else {
+                        return v.value;
+                    }
+                } catch(e) {
+                    ok = false;
+                }
+            });
+        });
+        out.rows = rows;
+        out.columns = columns;
+        return ok && out;
+    }
+    var m = is_valid(input_matrix);
+    if(m) {
+        m = new TMatrix(m);
+        debug.appendChild(element('p',{},'\\['+Numbas.jme.display.texify({tok:m})+'\\]'));
+
+        var is_row_echelon = scope.evaluate('is_row_echelon_form(m)',{m:m}).value;
+        var is_reduced_row_echelon = scope.evaluate('is_reduced_row_echelon_form(m)',{m:m}).value;
+        debug.appendChild(element('p',{class:'question'},'Is it in row echelon form? '+scope.evaluate('describe_why_row_echelon_form(matrix)',{matrix:m}).value));
+        if(!is_row_echelon) {
+            var res = scope.evaluate('row_echelon_form_display_determinant(m)',{m:m});
+            debug.appendChild(res.value[0]);
+        }
+        debug.appendChild(element('p',{class:'question'},'Is it in reduced row echelon form? '+scope.evaluate('describe_why_reduced_row_echelon_form(matrix)',{matrix:m}).value));
+        if(!is_reduced_row_echelon) {
+            var res = scope.evaluate('reduced_row_echelon_form_display(m)',{m:m});
+            debug.appendChild(res.value[0]);
+        }
+
+        MathJax.Hub.Queue(["Typeset",MathJax.Hub,debug]);
+    } else {
+        debug.innerHTML += '<p class="invalid">Invalid</p>';
+    }
+}
+
+var max_rows = 6;
+var max_columns = 8;
+
+var table = document.getElementById('matrix-entry');
+for(var row = 0;row<max_rows;row++) {
+    var tr = element('tr');
+    var r = [];
+    input_matrix.push(r);
+    table.appendChild(tr);
+    for(var column = 0; column<max_columns; column++) {
+        r.push('');
+        var td = element('td');
+        tr.appendChild(td);
+        function maker(i,j) {
+            return function(e) {
+                input_matrix[i][j] = e.target.value;
+                update();
+            }
+        }
+        var input = element('input',{type:'text'});
+        td.appendChild(input);
+        input.addEventListener('input',maker(row,column));
+    }
+}
+
+document.getElementById('randomise').addEventListener('click',function() {
+    Array.prototype.forEach.call(document.querySelectorAll('#matrix-entry input'),function(i){i.value=''});
+    var rows = Math.floor(Numbas.math.randomrange(2,max_rows));
+    var columns = Math.floor(Numbas.math.randomrange(2,max_columns));
+    input_matrix = input_matrix.map(function(r){ return r.map(function(c){return ''})});
+    for(var row=0;row<rows;row++) {
+        for(var column=0;column<columns;column++) {
+            var input = document.querySelectorAll('#matrix-entry tr')[row].querySelectorAll('input')[column];
+            var v = Math.floor(Numbas.math.randomrange(0,10))+'';
+            input_matrix[row][column] = v;
+            input.value = v;
+        }
+    }
+    update();
+});
+
+function show_fraction(f) {
+  return f.d==1 ? f.n+'' : f.n+'/'+f.d;
+}
+
+function show_matrix(m) {
+  m = m.map(r => r.map(function(c) {
+    if(typeof(c)=='number') {
+      return c;
+    } 
+    return show_fraction(c);
+  }))
+  console.table(m);
+}
+
+});
+		</script>
+</body>
