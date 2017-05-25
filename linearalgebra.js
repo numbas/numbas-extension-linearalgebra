@@ -170,7 +170,7 @@ extension.row_echelon_form = function(matrix) {
     return res;
 }
 
-var reduced_row_echelon_form = extension.reduced_row_echelon_form = function(matrix) {
+var reduced_row_echelon_form = function(matrix) {
     /** Put a matrix representing a system of equations in reduced row-echelon form.
      * Can:
      * * Swap two rows
