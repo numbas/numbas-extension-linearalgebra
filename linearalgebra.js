@@ -1,6 +1,8 @@
 Numbas.addExtension('linearalgebra',['jme','jme-display'],function(extension) {
 
 var math = Numbas.math;
+var vectormath = Numbas.vectormath;
+var matrixmath = Numbas.matrixmath;
 
 var Fraction = extension.Fraction = function(n) {
     if(typeof(n)=='number') {
@@ -58,7 +60,7 @@ Fraction.prototype = {
 }
 
 var fraction_matrix = extension.fraction_matrix = function(matrix) {
-    var o = matrix.map(function(r){return r.map(function(c){ return new Fraction(c)})});
+    var o = matrix.map(function(r){return r.map(function(c){ return c instanceof Fraction ? c : new Fraction(c)})});
     o.rows = matrix.rows;
     o.columns = matrix.columns;
     return o;
@@ -68,6 +70,17 @@ var unfraction_matrix = extension.unfraction_matrix = function(matrix) {
     o.rows = matrix.rows;
     o.columns = matrix.columns;
     return o;
+}
+
+function wrap_fraction_matrix(fn,unwrap_res) {
+    return function(matrix) {
+        matrix = fraction_matrix(matrix);
+        var res = fn(matrix);
+        if(unwrap_res) {
+            res = res.matrix;
+        }
+        return unfraction_matrix(res);
+    }
 }
 
 function logger(operations,matrix) {
@@ -163,12 +176,7 @@ var row_echelon_form = function(matrix) {
         operations: operations
     };
 }
-extension.row_echelon_form = function(matrix) {
-    matrix = fraction_matrix(matrix);
-    var res = row_echelon_form(matrix);
-    res.matrix = unfraction_matrix(res.matrix);
-    return res;
-}
+extension.row_echelon_form = wrap_fraction_matrix(row_echelon_form,true);
 
 var reduced_row_echelon_form = function(matrix) {
     /** Put a matrix representing a system of equations in reduced row-echelon form.
@@ -230,12 +238,126 @@ var reduced_row_echelon_form = function(matrix) {
         operations: operations
     };
 }
-extension.reduced_row_echelon_form = function(matrix) {
-    matrix = fraction_matrix(matrix);
-    var res = reduced_row_echelon_form(matrix);
-    res.matrix = unfraction_matrix(res.matrix);
-    return res;
+extension.reduced_row_echelon_form = wrap_fraction_matrix(reduced_row_echelon_form,true);
+
+function rref_without_zero(matrix) {
+    var rref = reduced_row_echelon_form(matrix).matrix;
+    return rref.filter(function(row) { return !vectormath.is_zero(row); });
 }
+
+function rank(matrix) {
+    return rref_without_zero(matrix).length;
+}
+extension.rank = function(matrix) {
+    matrix = fraction_matrix(matrix);
+    return rank(matrix);
+}
+
+function is_linearly_independent(vectors) {
+    return rref_without_zero(vectors).length==vectors.length;
+}
+extension.is_linearly_independent = function(vectors) {
+    vectors = fraction_matrix(vectors);
+    return is_linearly_independent(vectors);
+}
+
+var adjoin = extension.adjoin = function(matrix,vector) {
+    var o = [];
+    for(var i=0;i<matrix.length;i++) {
+        var row = matrix[i].slice();
+        row.push(vector[i] || 0);
+        o.push(row);
+    }
+    o.rows = matrix.rows;
+    o.columns = matrix.columns+1;
+}
+
+/** Subset of the given vectors, with the given dimension.
+ * Not always possible - if the vectors have length k, you can't have d>k. 
+ * If the input list has dimension less than d, it can't be done.
+ * Likewise with extra dependent vectors - if there aren't enough, it'll fail.
+ * The vectors are processed in order, so if you want a random subset you should shuffle the list first.
+ *
+ * @param {Array.<vector>} vectors 
+ * @param {Number} n - number of vectors to return
+ * @param {Number} d - dimension of the set (the first d vectors will be linearly independent, and any others will be multiples of those.
+ * @returns {Array.<vector>}
+ */
+function subset_with_dimension(vectors,n,d) {
+    vectors = vectors.filter(function(v){ return !vectormath.is_zero(v); });
+    var independent = [];
+    var combos = [];
+    for(var i=0; i<vectors.length && (independent.length<d || combos.length<n-d); i++) {
+        var v = vectors[i];
+        if(is_linearly_independent(independent.concat([v]))) {
+            independent.push(v);
+        } else {
+            combos.push(v);
+        }
+    }
+    if(independent.length<d || combos.length<n-d) {
+        throw(new Error("Couldn't generate a subset of the required size and dimension"));
+    }
+    return independent.slice(0,d).concat(combos.slice(0,n-d));
+}
+
+extension.subset_with_dimension = function(vectors,n,d) {
+    vectors = fraction_matrix(vectors);
+    var subset = subset_with_dimension(vectors,n,d);
+    return unfraction_matrix(subset);
+}
+
+/** Span of vectors in Z^n, with no element bigger than max
+ */
+function span(vectors,max) {
+    var dim = vectors[0].length;
+    var zero = [];
+    for(var i=0;i<dim;i++) {
+        zero.push(0);
+    }
+    var out = [zero];
+    vectors.forEach(function(v) {
+        var biggest = v.reduce(function(best,x){ return Math.max(best,Math.abs(x)); },0);
+        var lim = vectors.length*max/biggest;
+        var mults = [];
+        for(var i=0;i<=lim;i++) {
+            mults.push(vectormath.mul(i,v));
+            mults.push(vectormath.mul(-i,v));
+        }
+        
+        var nout = [];
+        out.forEach(function(v2) {
+            mults.forEach(function(m) {
+                var s = vectormath.add(m,v2);
+                if(!nout.find(function(v3){return vectormath.eq(v3,s)})) {
+                    nout.push(s);
+                }
+            });
+        });
+        out = nout;
+    })
+    out = out.filter(function(v){ return v.every(function(x){return Math.abs(x)<=max}) });
+    return out;
+}
+extension.span = span;
+
+function as_sum_of_basis(basis,v) {
+    basis.rows = basis.length;
+    basis.columns = basis.rows>0 ? basis[0].length : 0;
+    var matrix = matrixmath.transpose(basis);
+    var augmented_matrix = matrix.map(function(row,i) {
+        row = row.slice();
+        row.push(v[i] || 0);
+        return row;
+    });
+    augmented_matrix = fraction_matrix(augmented_matrix);
+    augmented_matrix.rows = matrix.rows;
+    augmented_matrix.columns = matrix.columns;
+    var rref = reduced_row_echelon_form(augmented_matrix).matrix;
+    rref = unfraction_matrix(rref);
+    return rref.map(function(row){return row[matrix.columns]});
+}
+extension.as_sum_of_basis = as_sum_of_basis;
 
 /** Is the given matrix in row echelon form?
  * If not, throws an error with an explanation why it isn't.
@@ -253,6 +375,7 @@ var is_row_echelon_form = extension.is_row_echelon_form = function(matrix) {
                 } 
             } else {
                 leader = column;
+                break;
             }
         }
     }
@@ -295,6 +418,9 @@ extension.is_reduced_row_echelon_form = function(matrix) {
 var scope = extension.scope;
 var jme = Numbas.jme;
 var funcObj = jme.funcObj;
+var TNum = jme.types.TNum;
+var TList = jme.types.TList;
+var TVector = jme.types.TVector;
 var TMatrix = jme.types.TMatrix;
 var TString = jme.types.TString;
 var THTML = jme.types.THTML;
@@ -402,5 +528,18 @@ scope.addFunction(new funcObj('describe_why_reduced_row_echelon_form',[TMatrix],
         return e.message;
     }
 }));
+
+scope.addFunction(new funcObj('rank',[TMatrix],TNum,extension.rank));
+
+scope.addFunction(new funcObj('is_linearly_independent',[TList],TBool,extension.is_linearly_independent,{unwrapValues:true}));
+
+scope.addFunction(new funcObj('adjoin',[TMatrix,TVector],TMatrix,adjoin,{unwrapValues:true}));
+
+scope.addFunction(new funcObj('subset_with_dimension',[TList,TNum,TNum],TList,function(vectors,n,d) {
+    var out = extension.subset_with_dimension(vectors,n,d);
+    return out.map(function(v){return new TVector(v); });
+},{unwrapValues:true}));
+
+scope.addFunction(new funcObj('as_sum_of_basis',[TList,TVector],TList,extension.as_sum_of_basis,{unwrapValues:true}));
 
 });

@@ -1,21 +1,12 @@
 <!doctype html>
 <html>
 <head>
-		<!-- numbas stuff -->
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/numbas.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme-builtins.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jme-display.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/math.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/util.js" charset="utf-8"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/localisation.js" charset="utf-8"></script>
-
-		<!-- R.js - localisation -->
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/i18next/i18next.js"></script>
-		<script charset="UTF-8" type="text/javascript" src="../../tests/locales.js"></script>
+        <meta charset="utf-8">
+        <script src="../../tests/jme-runtime.js"></script>
+        <script src="../../tests/locales.js"></script>
 
 		<!--JQuery scripts-->
-		<script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jquery/jquery.js"></script>
+        <script charset="UTF-8" type="text/javascript" src="../../runtime/scripts/jquery/jquery.js"></script>
 
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
@@ -52,7 +43,7 @@ Numbas.queueScript('go',['jme','extensions/linearalgebra/linearalgebra.js'],func
 
 var linearalgebra = Numbas.extensions.linearalgebra;
 
-var scope = new Numbas.jme.Scope([Numbas.jme.builtinScope,linearalgebra.scope]);
+var scope = window.scope = new Numbas.jme.Scope([Numbas.jme.builtinScope,linearalgebra.scope]);
 var TMatrix = Numbas.jme.types.TMatrix;
 
 function element(name,attrs,content) {
@@ -189,6 +180,13 @@ function show_matrix(m) {
   }))
   console.table(m);
 }
+
+var vs = Numbas.util.cartesian_power([-2,-1,0,1,2],4);
+vs = Numbas.math.shuffle(vs);
+console.log(vs);
+var subset = linearalgebra.subset_with_dimension(vs,6,4);
+console.log(JSON.stringify(subset));
+console.log(linearalgebra.reduced_row_echelon_form(subset));
 
 });
 		</script>

@@ -48,6 +48,33 @@ Returns `true` if the matrix is in reduced row echelon form.
 
 Returns a string describing why the matrix is not in reduced row echelon form, or "The matrix is in reduced row echelon form." if it is.
 
+### `rank(matrix)`
+
+Computes the rank of the matrix, by returning the number of rows of the reduced row echelon form of the matrix, with all zero rows removed.
+
+### `is_linearly_independent(matrix)`
+
+Returns `true` if the rows of the matrix are linearly independent.
+
+### `adjoin(matrix,vector)`
+
+Add the given column vector to the right of the given matrix.
+
+### `subset_with_dimension(vectors,n,d)`
+
+Return a subset of `n` of the given vectors, with dimension `d`.
+
+This is not always possible - if the vectors have length `k`, you can't have `d>k`. 
+This is not If the input list has dimension less than `d`, it can't be done.
+This is not Likewise with extra dependent vectors - if there aren't enough, it'll fail.
+
+The vectors are processed in order, so if you want a random subset you should shuffle the list first.
+
+### `as_sum_of_basis(basis,v)`
+
+Express the vector `v` as the sum of the given list of basis vectors.
+Returns a list of coefficients corresponding to the basis vectors.
+
 ## JavaScript functions
 
 All JavaScript functions are members of the `Numbas.extensions.linearalgebra` object.
@@ -87,3 +114,24 @@ Returns `true` if the given matrix is in row echelon form. If not, throws an err
 ### `is_reduced_row_echelon_form(matrix)`
 
 Returns `true` if the given matrix is in reduced row echelon form. If not, throws an error whose message is an explanation of why the matrix isn't in reduced row echelon form.
+
+### `rank(matrix)`
+
+Returns the rank of the given matrix.
+
+### `is_linearly_independent(vectors)`
+
+Returns `true` if the given list of vectors is linearly independent.
+
+### `adjoin(matrix,vector)`
+
+Add the given column vector to the right of the given matrix.
+
+### `subset_with_dimension(vectors,n,d)`
+
+Returns a subset of `n` of the given vectors with dimension `d`.
+
+### `as_sum_of_basis(basis,v)`
+
+Express the vector `v` as the sum of the given basis vectors.
+Returns a list of coefficients corresponding to the basis vectors.
